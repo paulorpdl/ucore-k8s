@@ -63,6 +63,8 @@ jobs:
             CRIO_VERSION=${{ inputs.crio_version }}
             KUBERNETES_VERSION=${{ inputs.kubernetes_version }}
             ENABLE_CEPH=${{ inputs.enable_ceph }}
+          extra-args: |
+            --privileged
           # optional: enable layer caching if runner supports it
           # layers: true
 
