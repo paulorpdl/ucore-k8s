@@ -33,6 +33,11 @@ on:
         type: string
         default: ubuntu-latest
 
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 jobs:
   call:
     uses: ./.github/workflows/build-reusable.yml

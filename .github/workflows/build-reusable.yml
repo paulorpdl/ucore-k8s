@@ -33,11 +33,6 @@ on:
         description: 'Password or token to authenticate to the registry (caller must pass this secret)'
         required: true
 
-permissions:
-  contents: read
-  packages: write
-  id-token: write
-
 jobs:
   build:
     runs-on: ${{ inputs.runner }}
