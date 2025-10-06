@@ -1,0 +1,94 @@
+name: build-and-publish
+on:
+  workflow_call:
+    inputs:
+      arch:
+        description: 'Target architecture (amd64, arm64)'
+        required: true
+        type: string
+      crio_version:
+        description: 'CRI-O version (e.g. 1.26.0)'
+        required: true
+        type: string
+      kubernetes_version:
+        description: 'Kubernetes version (e.g. 1.26.3)'
+        required: true
+        type: string
+      enable_ceph:
+        description: 'Enable Ceph tooling (true/false)'
+        default: false
+        type: boolean
+      image_tag:
+        description: 'Image tag to push (if omitted defaults to dev)'
+        required: false
+        type: string
+        default: dev
+      runner:
+        description: 'Runner label to use for the job (use self-hosted privileged for ostree steps)'
+        required: false
+        type: string
+        default: ubuntu-latest
+    secrets:
+      REGISTRY_PASSWORD:
+        description: 'Password or token to authenticate to the registry (caller must pass this secret)'
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR (Podman)
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build image (bootc) with Buildah
+        uses: redhat-actions/buildah-build@v2
+        with:
+          # Build using the existing Containerfile and tag with the fully-qualified name
+          containerfiles: |
+            ./Containerfile
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
+          # pass build args to the Containerfile so it can add repos / packages
+          build-args: |
+            ARCH=${{ inputs.arch }}
+            CRIO_VERSION=${{ inputs.crio_version }}
+            KUBERNETES_VERSION=${{ inputs.kubernetes_version }}
+            ENABLE_CEPH=${{ inputs.enable_ceph }}
+          # optional: enable layer caching if runner supports it
+          # layers: true
+
+      - name: Push image to GHCR
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          # Since tags are fully-qualified, registry/image inputs are not needed
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ inputs.image_tag }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      
+      
+      # Optional: build bootable artifacts (ISO/RAW/QCOW) with bootc-image-builder
+      # - name: Build ISO (bootc-image-builder)
+      #   uses: containers/bootc-image-builder-action@v1
+      #   with:
+      #     image: ghcr.io/${{ github.repository }}:dev
+      #     formats: iso
+      # - name: Upload ISO
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: bootc-iso
+      #     path: dist/*

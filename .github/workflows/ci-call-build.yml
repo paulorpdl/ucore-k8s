@@ -1,0 +1,47 @@
+name: ci-call-build
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: 'Target architecture'
+        required: true
+        type: string
+        default: amd64
+      crio_version:
+        description: 'CRI-O version (e.g. 1.26.0)'
+        required: true
+        type: string
+        default: 1.33.0
+      kubernetes_version:
+        description: 'Kubernetes version (e.g. 1.26.3)'
+        required: true
+        type: string
+        default: 1.33.0
+      enable_ceph:
+        description: 'Enable Ceph tooling (true/false)'
+        required: false
+        type: boolean
+        default: false
+      image_tag:
+        description: 'Image tag to build/push'
+        required: true
+        type: string
+        default: dev
+      runner_label:
+        description: 'Runner label to use for the called workflow'
+        required: false
+        type: string
+        default: ubuntu-latest
+
+jobs:
+  call:
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      arch: ${{ inputs.arch }}
+      crio_version: ${{ inputs.crio_version }}
+      kubernetes_version: ${{ inputs.kubernetes_version }}
+      enable_ceph: ${{ inputs.enable_ceph }}
+      image_tag: ${{ inputs.image_tag }}
+      runner: ${{ inputs.runner_label }}
+    secrets:
+      REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
