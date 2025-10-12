@@ -1,3 +1,7 @@
 dist/
 *.iso
 *.qcow2
+*.raw
+*.img
+*.bu
+*.ign

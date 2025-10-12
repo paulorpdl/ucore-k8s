@@ -9,13 +9,12 @@ ARG ENABLE_CEPH=false
 FROM ${BASE_IMAGE}:${BASE_TAG}
  
 # Re-declare build args in the build stage so they're available inside RUN
-ARG SKIP_BOOTC=false
 ARG KUBERNETES_VERSION
 ARG CRIO_VERSION
 ARG ENABLE_CEPH=false
 
-# Mark as bootable container image (skipable for local tests)
-RUN if [ "${SKIP_BOOTC}" != "true" ]; then bootc install to-filesystem /; else echo "SKIP_BOOTC=true: skipping bootc install (local test)"; fi
+# Note: bootc install is NOT run during container build - it should be run separately
+# after the container image is built using: podman run --privileged ... <image> bootc install ...
 
 # Repo templates (used to generate repo files at build time)
 COPY files/repo-templates/kubernetes.repo.tpl /repo-templates/kubernetes.repo.tpl
@@ -118,5 +117,5 @@ COPY files/etc/systemd/system/kubelet.service.d/10-extra-args.conf      /etc/sys
 # Enable services at image build-time
 RUN systemctl enable crio kubelet chronyd
 
-# Finalize ostree commit
-RUN if [ "${SKIP_BOOTC}" != "true" ]; then bootc install to-filesystem / --finalize; else echo "SKIP_BOOTC=true: skipping bootc install (local test)"; fi
+# Add bootc compatibility label
+LABEL containers.bootc=1

@@ -1,29 +1,79 @@
-Running builds for ucore-k8s
+# Building ucore-k8s
 
-This repository builds a bootable Fedora-based image with `bootc` + `rpm-ostree`.
+This repository builds a bootable Fedora-based image with **bootc** architecture for Kubernetes nodes.
 
-Requirements
-- A Linux build environment (WSL2/Ubuntu, VM, or self-hosted runner) with rootful Podman/Buildah.
-- The build requires privileged capabilities (mounts, systemd interactions). For reproducible CI runs you should use a self-hosted runner with a label such as `self-hosted-privileged` and run the job as a privileged user.
+## bootc Architecture
 
-Quick local test (WSL2/Ubuntu)
-1. Open WSL2 Ubuntu shell.
-2. Install Podman/Buildah and make sure it's usable as root.
-3. From the repo root run:
+This project uses **bootc** (boot container) architecture, which has two distinct phases:
 
+1. **Container Build**: Creates a container image with all the necessary packages and configuration
+2. **Bootable Image Creation**: Converts the container image into a bootable disk/ISO using specialized tools
+
+**Important**: bootc install commands CANNOT run during container build - they require a privileged environment that's separate from the build process.
+
+## Building the Container Image
+
+### Local Build
 ```bash
-sudo podman build --no-cache -t test-ucore-k8s -f Containerfile .
+podman build -t ucore-k8s:1.33.5 \
+  --build-arg KUBERNETES_VERSION=1.33.5 \
+  --build-arg CRIO_VERSION=1.33.5 \
+  -f Containerfile .
 ```
 
-CI (recommended)
-- Use the provided `ci-call-build.yml` workflow to run the reusable build workflow. The called workflow accepts the following inputs:
-  - arch, crio_version, kubernetes_version, enable_ceph, image_tag, runner
-- The caller (`ci-call-build.yml`) uses `GITHUB_TOKEN` as the registry password by default, but for org-level pushes consider a PAT with `write:packages`.
+### Using Makefile
+```bash
+make build
+```
 
-Notes
-- The Containerfile inserts `pkgs.k8s.io` repositories for Kubernetes and CRI-O when you provide `KUBERNETES_VERSION` and `CRIO_VERSION`. This follows the upstream recommendation.
-- If you see package dependency errors, consider using a self-hosted Fedora runner or mirror the required pkgs.k8s.io release into an internal repository.
+## Creating Bootable Images
 
-If you want, I can:
-- Push a test run to GitHub Actions that invokes the caller with a real minor pair (1.26) and report back the logs.
-- Help provisioning a self-hosted privileged runner (script + commands).
+After building the container, use official bootc tooling:
+
+### Raw Disk Image
+```bash
+make raw-image
+# Creates ucore-k8s.raw (10GB disk image)
+```
+
+### ISO Image  
+```bash
+make iso
+# Creates ucore-k8s.iso (bootable installer)
+```
+
+### Testing with QEMU
+```bash
+make qemu
+# Boots the raw image in QEMU
+```
+
+### VM Installation
+```bash
+make virt-install
+# Creates VM using virt-install with proper virtio drivers
+```
+
+## Requirements
+
+- **Rootless Podman**: Container builds work with rootless podman
+- **bootc-image-builder**: Required for creating bootable images (installed via toolbox/distrobox if needed)
+- **Privileged access**: Only needed for bootc-image-builder operations, not container builds
+
+## CI/CD Notes
+
+- Container builds work in standard GitHub Actions runners (no --privileged needed)
+- bootc-image-builder requires privileged runners for creating bootable images
+- The workflow automatically handles version alignment between Kubernetes and CRI-O
+
+## Ignition Configuration
+
+Create bootc systems with Ignition for first-boot configuration:
+
+```bash
+# Convert Butane to Ignition
+butane < config.bu > config.ign
+
+# Use with bootc install
+bootc install to-disk --via-loopback /dev/sda --ignition-file config.ign
+```
